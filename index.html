@@ -4,7 +4,7 @@
 
 <head>
 
-<title>Cohort 4 Office Locations</title>
+<title> Office Locations</title>
 
 <style>
 html, body {
@@ -202,7 +202,7 @@ li.onclick = function () {
 
             <b>Project:</b> ${office.project_name}<br>
 
-            <b>Cohort:</b> ${office.fiscal_year}
+            
         </div>
     `);
 
@@ -258,7 +258,7 @@ ul.appendChild(li);
 
                     project: office.project_name,
 
-                    cohort: office.fiscal_year
+                    
 
                 }
 
@@ -414,8 +414,7 @@ function createMarkerIcon(color) {
                     <b>Project:</b>
                     ${event.feature.getProperty("project")}<br>
 
-                    <b>Cohort:</b>
-                    ${event.feature.getProperty("cohort")}
+                   
 
                 </div>
                 `

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>Cohort 4 Office Locations</title>
+
+<style>
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+#map {
+    width: 100%;
+    height: 100vh;
+}
+
+#sidebar {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    width: 260px;
+    height: 55vh;
+
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    overflow-y: auto;
+
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+
+    z-index: 1000;
+}
+
+.countryRow {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.countryName {
+    font-weight: bold;
+}
+
+.countryCount {
+    color: #0b57d0;
+}
+
+.countryGroup {
+    margin-bottom: 10px;
+}
+
+.countryGroup summary {
+    cursor: pointer;
+    padding: 8px;
+    background: #f4f4f4;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+.countryGroup ul {
+    margin: 8px 0 0 18px;
+    padding: 0;
+}
+
+.countryGroup li {
+    margin: 4px 0;
+    font-size: 14px;
+}
+
+.officeItem {
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.officeItem:hover {
+    background: #e8f0fe;
+}
+
+</style>
+
+</head>
+
+<body>
+   <div id="sidebar">
+    <h2>Office Summary</h2>
+
+    <div id="countrySummary"></div>
+
+    <hr>
+
+    <strong>Total Offices:</strong>
+    <span id="totalOffices"></span>
+</div>
+
+<div id="map"></div>
+
+<script>
+
+let map;
+let officeLayer;
+
+async function initMap() {
+
+    map = new google.maps.Map(
+        document.getElementById("map"),
+        {
+            center: {
+                lat: 8,
+                lng: -11
+            },
+            zoom: 5
+        }
+    );
+const clickInfo =
+        new google.maps.InfoWindow();
+        
+    // Load data
+    const response = await fetch(
+        "YOUR_API_GATEWAY_URL"
+    );
+
+    const offices = await response.json();
+
+    
+
+// =============================
+// COUNTRY SUMMARY (Expandable)
+// =============================
+
+const countries = {};
+
+offices.forEach(function(office){
+
+    const country = office.country_name;
+
+    if (!countries[country]) {
+        countries[country] = [];
+    }
+
+    countries[country].push(office);
+
+});
+
+document.getElementById("totalOffices").textContent = offices.length;
+
+const summary = document.getElementById("countrySummary");
+summary.innerHTML = "";
+
+Object.keys(countries)
+.sort()
+.forEach(function(country){
+
+    const officesInCountry = countries[country];
+
+    const details = document.createElement("details");
+    details.className = "countryGroup";
+
+    const summaryTag = document.createElement("summary");
+
+    summaryTag.innerHTML =
+        `<strong>${country}</strong> (${officesInCountry.length})`;
+
+    details.appendChild(summaryTag);
+
+    const ul = document.createElement("ul");
+
+    officesInCountry
+        .sort((a,b) => a.branch_office_name.localeCompare(b.branch_office_name))
+        .forEach(function(office){
+
+           const li = document.createElement("li");
+
+li.textContent = office.branch_office_name;
+
+li.className = "officeItem";
+
+li.onclick = function () {
+
+    const position = {
+        lat: parseFloat(office.gps_lat),
+        lng: parseFloat(office.gps_long)
+    };
+
+    map.panTo(position);
+
+    map.setZoom(13);
+
+    clickInfo.setContent(`
+        <div>
+            <h3>${office.branch_office_name}</h3>
+
+            <b>Country:</b> ${office.country_name}<br>
+
+            <b>Project:</b> ${office.project_name}<br>
+
+            <b>Cohort:</b> ${office.fiscal_year}
+        </div>
+    `);
+
+    clickInfo.setPosition(position);
+
+    clickInfo.open(map);
+
+};
+
+ul.appendChild(li);
+
+        });
+
+    details.appendChild(ul);
+
+    summary.appendChild(details);
+
+});
+
+    // =============================
+    // CREATE MAP LAYER
+    // =============================
+
+    const geoJson = {
+
+        type: "FeatureCollection",
+
+        features: offices.map(function(office){
+
+            return {
+
+                type: "Feature",
+
+                geometry: {
+
+                    type: "Point",
+
+                    coordinates: [
+
+                        parseFloat(office.gps_long),
+
+                        parseFloat(office.gps_lat)
+
+                    ]
+
+                },
+
+                properties: {
+
+                    name: office.branch_office_name,
+
+                    country: office.country_name,
+
+                    project: office.project_name,
+
+                    cohort: office.fiscal_year
+
+                }
+
+            };
+
+        })
+
+    };
+
+    officeLayer = new google.maps.Data();
+
+    officeLayer.addGeoJson(geoJson);
+
+    officeLayer.setMap(map);
+
+ 
+
+// =============================
+// Dynamic unlimited country colours
+// =============================
+
+const countryColors = {};
+
+const countryColorList = {};
+
+
+// Generate a random HEX colour
+
+function generateColor() {
+
+    return "#" +
+        Math.floor(Math.random() * 16777215)
+        .toString(16)
+        .padStart(6, "0");
+
+}
+
+
+
+// Get or create colour for country
+
+function getCountryColor(country) {
+
+
+    if (!countryColors[country]) {
+
+        countryColors[country] =
+            generateColor();
+
+    }
+
+
+    return countryColors[country];
+
+}
+
+
+
+// Create SVG marker
+
+function createMarkerIcon(color) {
+
+
+    return {
+
+        path: google.maps.SymbolPath.CIRCLE,
+
+        fillColor: color,
+
+        fillOpacity: 1,
+
+        strokeColor: "#ffffff",
+
+        strokeWeight: 2,
+
+        scale: 8
+
+    };
+
+}
+
+    officeLayer.setStyle(function(feature){
+
+
+    const country =
+        feature.getProperty("country");
+
+
+    const color =
+        getCountryColor(country);
+
+
+
+    return {
+
+
+        icon:
+            createMarkerIcon(color),
+
+
+        title:
+            feature.getProperty("name")
+
+
+    };
+
+
+});
+
+    // =============================
+    // FIT MAP TO DATA
+    // =============================
+
+    const bounds =
+        new google.maps.LatLngBounds();
+
+    offices.forEach(function(office){
+
+        bounds.extend({
+
+            lat:
+                parseFloat(office.gps_lat),
+
+            lng:
+                parseFloat(office.gps_long)
+
+        });
+
+    });
+
+    map.fitBounds(bounds);
+
+    // =============================
+    // CLICK POPUP
+    // =============================
+
+   
+
+    officeLayer.addListener(
+        "click",
+        function(event){
+
+            clickInfo.setContent(
+
+                `
+                <div>
+
+                    <h3>${event.feature.getProperty("name")}</h3>
+
+                    <b>Country:</b>
+                    ${event.feature.getProperty("country")}<br>
+
+                    <b>Project:</b>
+                    ${event.feature.getProperty("project")}<br>
+
+                    <b>Cohort:</b>
+                    ${event.feature.getProperty("cohort")}
+
+                </div>
+                `
+
+            );
+
+            clickInfo.setPosition(
+                event.latLng
+            );
+
+            clickInfo.open(map);
+
+        }
+
+    );
+
+}
+
+</script>
+
+<script async
+src=""https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_API_KEY&callback=initMap"">
+</script>
+
+</body>
+
+</html>
